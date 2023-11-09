@@ -101,6 +101,43 @@ class Regressor(AstraModel):
         return F.mse_loss(y_pred, y, reduction="mean").sqrt().item()
 
 
+class LearningToLoss(AstraModel):
+    def __init__(self, backbone, module):
+        super().__init__()
+        self.backbone = backbone
+        self.module = module
+
+    def forward(self, x):
+        y_hat, y_layers = self.backbone(x)
+        l_hat = self.module(y_layers)
+        return y_hat, l_hat
+    
+
+class Backbone(AstraModel):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, x):
+        num_layers = sum(1 for name, _ in (self.model).named_children() if name.startswith('layer'))
+        x = self.model.initial(x)
+        out_layer = []
+        for i in range(num_layers):
+            x = getattr(self.model, f"layer{i+1}")(x)
+            out_layer.append(x)
+        result = self.model.final(x)
+        return result, out_layer
+    
+
+class Module(AstraModel):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+    
+    def forward(self, x):
+        return self.model(x)
+
+
 # Multi-layer perceptron (MLP)
 class MLP(AstraModel):
     """Multi-layer perceptron (MLP) with dropout and activation function."""
